@@ -7,7 +7,7 @@ import {
     Sparky,
     UglifyJSPlugin,
 } from 'fuse-box';
-import { TypeCheckPlugin } from 'fuse-box-typechecker/dist/commonjs';
+import { TypeHelper } from 'fuse-box-typechecker/dist/commonjs';
 import { Bundle } from 'fuse-box/dist/typings/core/Bundle';
 import { FuseBoxOptions } from 'fuse-box/dist/typings/core/FuseBox';
 import * as path from 'path';
@@ -87,10 +87,6 @@ Sparky.task('options', () => {
         cache: envVars.NODE_ENV !== 'production',
         hash: envVars.NODE_ENV === 'production',
         plugins: [
-            TypeCheckPlugin({
-                bundles: ['server'],
-                quit: envVars.NODE_ENV === 'production',
-            }),
             JSONPlugin(),
             CopyPlugin({
                 files: ['*.jpg', '*.svg', '*.png', '*.ico'],
@@ -103,11 +99,18 @@ Sparky.task('options', () => {
     };
 });
 
+const typeHelper = TypeHelper({
+    name: 'None',
+    basePath: './',
+    tsLint: './tslint.json',
+    tsConfig: './tsconfig.json',
+});
+
 Sparky.task('build', () => {
     if (envVars.NODE_ENV === 'production') {
-        options.plugins!.push([
+        options.plugins!.push(
             UglifyJSPlugin(),
-        ]);
+        );
     }
 
     fuse = FuseBox.init(options);
@@ -138,7 +141,11 @@ Sparky.task('build', () => {
         clientBundle = clientBundle.split(bundleInfo.instructions, `${bundleName} > ${bundleInfo.entrypoint}`);
     }
 
-    serverBundle.instructions(` > [server/index.ts] +process +[views/**/**.tsx]`);
+  serverBundle.instructions(` > [server/index.ts] +process +[views/**/**.tsx]`)
+				.completed(proc => {
+						console.log(`\x1b[36m%s\x1b[0m`, 'server bundled')
+						typeHelper.runSync()
+				})
     clientBundle.instructions(` > [client/index.tsx] +[views/**/**.tsx]`);
 });
 
